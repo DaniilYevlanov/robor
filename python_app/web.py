@@ -14,8 +14,6 @@ def gen_frames():
 
     try:
         while True:
-            # Получаем изображение
-            image = picam2.capture_array()  # Это захват изображения в массив (numpy)
             
             # Преобразуем в JPEG
             with io.BytesIO() as output:
