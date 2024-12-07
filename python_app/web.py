@@ -1,12 +1,34 @@
 import flask
-from linuxpy.video.device import Device
-
+import time
+from picamera2 import Picamera2
+import io
 app = flask.Flask('basic-web-cam')
 
+picam2 = Picamera2()
+
+# Настроим поток изображения
 def gen_frames():
-    with Device.from_id(0) as cam:
-        for frame in cam:
-            yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame.data + b"\r\n"
+    # Настроим камеру (если нужно, выберите настройки)
+    picam2.start_preview()  # Этот метод для предварительного просмотра, можно не использовать, если не нужно отображать на экране
+    picam2.start()  # Запуск камеры
+
+    try:
+        while True:
+            # Получаем изображение
+            image = picam2.capture_array()  # Это захват изображения в массив (numpy)
+            
+            # Преобразуем в JPEG
+            with io.BytesIO() as output:
+                picam2.capture_file(output, format='jpeg')  # Сохраняем изображение в JPEG
+                frame = output.getvalue()  # Получаем JPEG данные
+
+                # Отправляем JPEG данные через поток
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            
+            time.sleep(0.1)  # Небольшая задержка, чтобы снизить нагрузку на процессор
+    finally:
+        picam2.stop()  # Остановить камеру, когда поток завершится
 
 @app.route("/")
 def index():
