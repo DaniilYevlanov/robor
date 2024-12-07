@@ -1,0 +1,4 @@
+Flask
+opencv-python
+opencv-python-headless
+RPi.GPIO
