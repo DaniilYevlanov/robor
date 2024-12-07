@@ -4,9 +4,10 @@ import time
 import RPi.GPIO as GPIO
 import flask
 from linuxpy.video.device import Device
+from picamera2 import Picamera2
 
 app = Flask(__name__)
-camera = cv2.VideoCapture(0)  # веб-камера
+
 
 controlX, controlY = 0, 0  # глобальные переменные положения джойстика с web-страницы
 
@@ -74,9 +75,25 @@ def set_motor_b(speed, direction):
 
 
 def gen_frames():
-    with Device.from_id(0) as cam:
-        for frame in cam:
-            yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame.data + b"\r\n"
+    # Настроим камеру (если нужно, выберите настройки)
+    picam2.start_preview()  # Этот метод для предварительного просмотра, можно не использовать, если не нужно отображать на экране
+    picam2.start()  # Запуск камеры
+
+    try:
+        while True:
+            
+            # Преобразуем в JPEG
+            with io.BytesIO() as output:
+                picam2.capture_file(output, format='jpeg')  # Сохраняем изображение в JPEG
+                frame = output.getvalue()  # Получаем JPEG данные
+
+                # Отправляем JPEG данные через поток
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            
+            time.sleep(0.1)  # Небольшая задержка, чтобы снизить нагрузку на процессор
+    finally:
+        picam2.stop()  # Остановить камеру, когда поток завершится
 
             
 @app.route('/video_feed')
