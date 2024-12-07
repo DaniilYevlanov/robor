@@ -28,14 +28,6 @@
 		margin: auto;
 	}
 	
-	#logo {
-		width: 7%;
-		height: auto;
-		position: absolute;
-		padding: 0px;
-		top: 3%;
-		left: 1%;
-	}
 	
 	#joyDiv {
 		width: max(33vw, 33vh);
@@ -46,11 +38,17 @@
 		bottom: 0%;
 		right: 0%;
 	}
+
+	#img {
+                    width: 100vw;
+                    height: 100vh;
+                    object-fit: cover;
+                }
 	
 	</style>
 </head>
 <body>
-	<div id="videoContainer"><img id="video" src="/video_feed"></div>
+	<div id="videoContainer"><img src="/video_feed" /></div>
 	<script type="text/javascript">
 		var joyParam = {"title": "joystick", 
 						"autoReturnToCenter": true, 
