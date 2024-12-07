@@ -3,7 +3,8 @@ import threading
 import time
 import RPi.GPIO as GPIO
 import subprocess
-
+import picamera2
+import io
 app = Flask(__name__)
 
 controlX, controlY = 0, 0  # Глобальные переменные положения джойстика с web-страницы
@@ -70,37 +71,21 @@ def set_motor_b(speed, direction):
     pwm_b.ChangeDutyCycle(abs(speed))
 
 
-def mjpeg_stream():
-    """Generate MJPEG stream using FFmpeg"""
-    process = subprocess.Popen(
-        [
-            "ffmpeg",
-            "-f", "v4l2",  # Video4Linux2 input
-            "-i", "/dev/video0",  # Camera device
-            "-s", "640x480",  # Resolution
-            "-c:v", "mjpeg",  # MJPEG codec
-            "-f", "mjpeg",  # Output format
-            "-"
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL
-    )
-    try:
-        while True:
-            data = process.stdout.read(1024)
-            if not data:
-                break
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + data + b'\r\n')
-    except GeneratorExit:
-        process.terminate()
+def generate_frames():
+    with picamera2.PiCamera() as camera:
+        camera.resolution = (640, 480)
+        camera.framerate = 24
+        stream = io.BytesIO()
 
+        for _ in camera.capture_continuous(stream, 'jpeg', use_video_port=True):
+            stream.seek(0)
+            yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + stream.read() + b'\r\n'
+            stream.seek(0)
+            stream.truncate()
 
 @app.route('/video_feed')
 def video_feed():
-    """Video feed route"""
-    return Response(mjpeg_stream(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 @app.route('/')
