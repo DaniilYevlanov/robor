@@ -1,13 +1,14 @@
-from flask import Flask, Response, request
+from flask import Flask, render_template, Response, request
 import threading
 import time
 import RPi.GPIO as GPIO
-import subprocess
-import picamera2
-import io
-app = Flask(__name__)
+import flask
+from linuxpy.video.device import Device
 
-controlX, controlY = 0, 0  # Глобальные переменные положения джойстика с web-страницы
+app = Flask(__name__)
+camera = cv2.VideoCapture(0)  # веб-камера
+
+controlX, controlY = 0, 0  # глобальные переменные положения джойстика с web-страницы
 
 # GPIO setup
 GPIO.setmode(GPIO.BCM)  # Use BCM pin numbering
@@ -71,27 +72,23 @@ def set_motor_b(speed, direction):
     pwm_b.ChangeDutyCycle(abs(speed))
 
 
-def generate_frames():
-    with picamera2.PiCamera() as camera:
-        camera.resolution = (640, 480)
-        camera.framerate = 24
-        stream = io.BytesIO()
 
-        for _ in camera.capture_continuous(stream, 'jpeg', use_video_port=True):
-            stream.seek(0)
-            yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + stream.read() + b'\r\n'
-            stream.seek(0)
-            stream.truncate()
+def gen_frames():
+    with Device.from_id(0) as cam:
+        for frame in cam:
+            yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame.data + b"\r\n"
 
+            
 @app.route('/video_feed')
 def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return flask.Response(
+        gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 @app.route('/')
 def index():
     """Render index page"""
-    return "Joystick-Controlled Robot with Video Feed"
+    return render_template('index.html')
 
 
 @app.route('/control')
