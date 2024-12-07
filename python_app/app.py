@@ -1,8 +1,8 @@
-from flask import Flask, render_template, Response, request
+from flask import Flask, Response, request
 import threading
 import time
 import RPi.GPIO as GPIO
-from picamera2 import Picamera2, MjpegEncoder
+import subprocess
 
 app = Flask(__name__)
 
@@ -39,10 +39,6 @@ pwm_b = GPIO.PWM(ENB, PWM_FREQ)
 pwm_a.start(0)
 pwm_b.start(0)
 
-# Initialize Picamera2
-picam2 = Picamera2()
-picam2.configure(picam2.create_video_configuration())
-picam2.start()
 
 def set_motor_a(speed, direction):
     """Set speed and direction for Motor A"""
@@ -74,17 +70,43 @@ def set_motor_b(speed, direction):
     pwm_b.ChangeDutyCycle(abs(speed))
 
 
+def mjpeg_stream():
+    """Generate MJPEG stream using FFmpeg"""
+    process = subprocess.Popen(
+        [
+            "ffmpeg",
+            "-f", "v4l2",  # Video4Linux2 input
+            "-i", "/dev/video0",  # Camera device
+            "-s", "640x480",  # Resolution
+            "-c:v", "mjpeg",  # MJPEG codec
+            "-f", "mjpeg",  # Output format
+            "-"
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL
+    )
+    try:
+        while True:
+            data = process.stdout.read(1024)
+            if not data:
+                break
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + data + b'\r\n')
+    except GeneratorExit:
+        process.terminate()
+
+
 @app.route('/video_feed')
 def video_feed():
     """Video feed route"""
-    return Response(picam2.output_stream(MjpegEncoder()),
-                    mimetype='multipart/x-mixed-replace; boundary=--frame')
+    return Response(mjpeg_stream(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 @app.route('/')
 def index():
     """Render index page"""
-    return render_template('index.html')
+    return "Joystick-Controlled Robot with Video Feed"
 
 
 @app.route('/control')
