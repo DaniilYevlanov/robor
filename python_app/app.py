@@ -3,9 +3,8 @@ import threading
 import time
 import RPi.GPIO as GPIO
 import flask
-from linuxpy.video.device import Device
 from picamera2 import Picamera2
-
+picam2 = Picamera2()
 app = Flask(__name__)
 
 
